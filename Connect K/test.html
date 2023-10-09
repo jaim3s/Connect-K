@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connect Four</title>
+    <style>
+        .board {
+            display: grid;
+            grid-template-columns: repeat(7, 50px);
+            grid-gap: 5px;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            background-color: white;
+            border: 1px solid black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Connect Four</h1>
+    <div class="board" id="board"></div>
+    <button onclick="resetBoard()">Reset Board</button>
+
+    <script>
+        const ROWS = 6;
+        const COLUMNS = 7;
+        let currentPlayer = 'red'; // 'red' or 'yellow'
+        let board = [];
+
+        // Create the game board
+        function createBoard() {
+            for (let row = 0; row < ROWS; row++) {
+                board[row] = [];
+                for (let col = 0; col < COLUMNS; col++) {
+                    board[row][col] = null;
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    cell.addEventListener('click', makeMove);
+                    document.getElementById('board').appendChild(cell);
+                }
+            }
+        }
+
+        // Handle a player's move
+        function makeMove(event) {
+            const row = parseInt(event.target.dataset.row);
+            const col = parseInt(event.target.dataset.col);
+
+            // Check if the column is full
+            if (board[0][col] !== null) {
+                return;
+            }
+
+            // Find the lowest empty row in the selected column
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r][col] === null) {
+                    board[r][col] = currentPlayer;
+                    event.target.style.backgroundColor = currentPlayer;
+                    checkWin(row, col);
+                    currentPlayer = (currentPlayer === 'red') ? 'yellow' : 'red';
+                    break;
+                }
+            }
+        }
+
+        // Check for a win
+        function checkWin(row, col) {
+            // Implement your win-checking logic here
+        }
+
+        // Reset the board
+        function resetBoard() {
+            board = [];
+            currentPlayer = 'red';
+            document.getElementById('board').innerHTML = '';
+            createBoard();
+        }
+
+        createBoard();
+    </script>
+</body>
+</html>
