@@ -8,6 +8,7 @@ let winner = null;
 class TreeNode {
     constructor (game) {
         this.game = game;
+        this.score = 0;
         this.childs = [];
     }
 }
@@ -190,21 +191,6 @@ class ConnectK {
         return clone;
       }
 
-    generateDecisionTree(tree_node, depth) {
-        if (depth === 0) {
-          return tree_node; // Stop generating tree at this depth
-        }
-        for (let col = 0; col < tree_node.game.board.n; col++) {
-            if (tree_node.game.canPlay(col)) {
-                const clone = tree_node.game.clone();
-                clone.play(col);
-                let new_tree_node = new TreeNode(clone);
-                tree_node.childs.push(new_tree_node);
-                new_tree_node.game.generateDecisionTree(new_tree_node, depth - 1);
-            }
-        }
-      }
-
     run() {
         let flag = true;
         let winner = null;
@@ -242,10 +228,67 @@ class ConnectK {
     }
 }
 
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message || 'Assertion failed');
+  }
+}
+
 class Solver {
 
-    negamax(game) {
-        if (game.isFull()) {
+    generateDecisionTree(tree_node, depth) {
+        if (depth === 0) {
+          return tree_node; // Stop generating tree at this depth
+        }
+        for (let col = 0; col < tree_node.game.board.n; col++) {
+            if (tree_node.game.canPlay(col)) {
+                const clone = tree_node.game.clone();
+                clone.play(col);
+                let new_tree_node = new TreeNode(clone);
+                tree_node.childs.push(new_tree_node);
+                new_tree_node.game.generateDecisionTree(new_tree_node, depth - 1);
+            }
+        }
+    }
+
+    minimax(tree_node, depth) {
+        if (depth === 0 || tree_node.game.isFull()) {
+          return tree_node.game.movements; // Stop generating tree at this depth
+        }
+        let current_player = 1 + tree_node.movements
+        if (current_player === 1) {
+            let max_eval = Number.NEGATIVE_INFINITY;
+            for (let col = 0; col < tree_node.game.board.n; col++) {
+                if (tree_node.game.canPlay(col)) {
+                    const clone = tree_node.game.clone();
+                    clone.play(col);
+                    let new_tree_node = new TreeNode(clone);
+                    tree_node.childs.push(new_tree_node);
+                    let evaluation = this.minimax(new_tree_node, depth - 1);
+                    max_eval = Math.max(evaluation, max_eval);
+                }
+            }
+            tree_node.score = max_eval;
+        } else {
+            let min_eval = Number.POSITIVE_INFINITY;
+            for (let col = 0; col < tree_node.game.board.n; col++) {
+                if (tree_node.game.canPlay(col)) {
+                    const clone = tree_node.game.clone();
+                    clone.play(col);
+                    let new_tree_node = new TreeNode(clone);
+                    tree_node.childs.push(new_tree_node);
+                    let evaluation = this.minimax(new_tree_node, depth - 1);
+                    min_eval = Math.min(evaluation, min_eval);
+                }
+            }
+            tree_node.score = min_eval;
+        }
+    }
+
+    negamax(game, alpha, beta, depth) {
+        assert(alpha < beta, "alpha is smaller than beta");
+
+        if (game.isFull() || depth==0) {
             return 0;
         }
 
@@ -256,22 +299,30 @@ class Solver {
             }
         }
 
-        let best_score = -game.board.m*game.board.n;
+        let max = (game.board.m*game.board.n-1-game.movements)/2;
+        if (beta > max) {
+            beta = max;
+            if (alpha >= beta) return beta;
+        }
 
         for (let col = 0; col < game.board.n; col++) {
             if (game.canPlay(col)) {
                 let clone = game.clone();
                 clone.play(col);
-                let score = -this.negamax(clone);
-                if (score > best_score) {
-                    best_score = score;
+                let score = -this.negamax(clone, -beta, -alpha, depth-1);
+                if (score >= beta) {
+                    return score;
+                }
+                if (score > alpha) {
+                    alpha = score;
                 }
             }
         }
 
-        return best_score;
+        return alpha;
     }
 }
+
 function setGridSize(rows, cols) {
     gameBoard.style.setProperty('--rows', rows);
     gameBoard.style.setProperty('--cols', cols);
@@ -339,11 +390,11 @@ playButton.addEventListener("click", function() {
         }
 
         //console.log(game.play_sequence("1122"));
-        //let root = new TreeNode(game.clone());
+        let root = new TreeNode(game.clone());
         let solver = new Solver();
-        let score = solver.negamax(game);
+        let score = solver.minimax(root, 3);
         //game.generateDecisionTree(root, 3);
-        console.log(score);
+        console.log(root);
     } else {
         console.log("Please enter a valid positive integer for the grid size.");
     } 

@@ -6,18 +6,25 @@
 </head>
 <body>
     <h1>Connect K</h1>
+
+    <p>Variation of the game Connect 4</p>
+
     <!-- Size input -->
     <label for="size">Size:</label>
-    <input type="size" id="size" name="size" min="0" step="1" required>
+    <input type="size" id="size" size="4" name="size" min="0" step="1" maxlength="4">
 
     <!-- k input -->
     <label for="k">K:</label>
-    <input type="k" id="k" name="k" min="0" step="1" required>
+    <input type="k" id="k" size="4" name="k" min="0" step="1" maxlength="4">
 
     <!-- Button to send information-->
     <button id="play-button">Play</button>
 
     <div id="game-board"></div>
+
+    <!-- k input -->
+    <label for="sequence">Sequence:</label>
+    <input type="text" id="sequence" size="40" name="sequence" min="0" step="1">
 
     <script type="text/javascript" src="app.js"></script>
 </body>
