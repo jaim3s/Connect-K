@@ -1,8 +1,9 @@
-// Get references to the input elements and the play button
+// Get references of te HTML elements
 const sizeInput = document.getElementById("size");
 const kInput = document.getElementById("k");
 const playButton = document.getElementById("play-button");
 const gameBoard = document.getElementById("game-board");
+const scoresArea = document.getElementById("scores-area");
 let winner = null;
 
 class TreeNode {
@@ -10,6 +11,7 @@ class TreeNode {
         this.game = game;
         this.score = 0;
         this.childs = [];
+        this.col_played = -1;
     }
 }
 
@@ -236,6 +238,80 @@ function assert(condition, message) {
 
 class Solver {
 
+    generate_offsets(k) {
+        let offsets = [];
+        for (let i = 0; i < k; i++) {
+            let column_offsets = [];
+            let row_offsets = [];
+            let d1_offsets = [];
+            let d2_offsets = [];
+            for (let j = 0; j < k; j++) {
+                // Column
+                column_offsets.push([-j+i, 0]);
+                // Row 
+                row_offsets.push([0, -j+i]);
+                // Right-Left diagonal
+                d1_offsets.push([-j+i, -j+i]);
+                // Left-Right diagonal
+                d2_offsets.push([-j+i, j-i]);
+            }
+            offsets.push(column_offsets);
+            offsets.push(row_offsets);
+            offsets.push(d1_offsets);
+            offsets.push(d2_offsets);
+        }
+        return offsets
+    }
+
+    get_score(game, offsets, col) {
+        let score1 = 0;
+        let score2 = 0;
+        for (let i = 0; i < offsets.length; i++) {
+            let row = game.board.m-game.height[col];
+            let flag = 0;
+            for (let j = 0; j < offsets[i].length; j++) {
+                let row_offset = offsets[i][j][0];
+                let col_offset = offsets[i][j][1];
+                if (row+row_offset <= game.board.m-1 && row+row_offset >= 0 && col+col_offset <= game.board.n-1 && col+col_offset >= 0) {
+                    flag += 1;
+                } else {
+                    break;
+                }
+            }
+            if (flag == offsets[i].length) {
+                let cnt1 = 0;
+                let cnt2 = 0;
+                for (let j = 0; j < offsets[i].length; j++) {
+                    let row_offset = offsets[i][j][0];
+                    let col_offset = offsets[i][j][1];
+                    if (game.board.values[row+row_offset][col+col_offset] == 1) {
+                        cnt1 += 1;
+                    } else if (game.board.values[row+row_offset][col+col_offset] == 2) {
+                        cnt2 += 1;
+                    }
+                }
+                if (cnt1 && cnt2 == 0) {
+                    score1 += cnt1;
+                }
+                if (cnt2 && cnt1 == 0) {
+                    score2 += cnt2;
+                }
+            }
+        }
+        return [score1, score2]
+    }
+
+    heuristic(game, offsets) {
+        let total_score1 = 0;
+        let total_score2 = 0;
+        for (let col = 0; col < game.board.n; col++) {
+            let [x, y] = this.get_score(game, offsets, col);
+            total_score1+=x;
+            total_score2+=y;
+        }
+        return total_score1-total_score2;
+    }
+
     generateDecisionTree(tree_node, depth) {
         if (depth === 0) {
           return tree_node; // Stop generating tree at this depth
@@ -245,17 +321,20 @@ class Solver {
                 const clone = tree_node.game.clone();
                 clone.play(col);
                 let new_tree_node = new TreeNode(clone);
-                tree_node.childs.push(new_tree_node);
-                new_tree_node.game.generateDecisionTree(new_tree_node, depth - 1);
+                tree_node.childs.push(this.generateDecisionTree(new_tree_node, depth - 1));
             }
         }
+        return tree_node;
     }
 
-    minimax(tree_node, depth) {
+    minimax(tree_node, depth, offsets) {
         if (depth === 0 || tree_node.game.isFull()) {
-          return tree_node.game.movements; // Stop generating tree at this depth
+            // Generate the score of the current board
+            let score = this.heuristic(tree_node.game, offsets);
+            tree_node.score = score;
+            return score;
         }
-        let current_player = 1 + tree_node.movements
+        let current_player = 1 + (tree_node.game.movements)%2;
         if (current_player === 1) {
             let max_eval = Number.NEGATIVE_INFINITY;
             for (let col = 0; col < tree_node.game.board.n; col++) {
@@ -263,12 +342,14 @@ class Solver {
                     const clone = tree_node.game.clone();
                     clone.play(col);
                     let new_tree_node = new TreeNode(clone);
+                    new_tree_node.col_played = col;
                     tree_node.childs.push(new_tree_node);
-                    let evaluation = this.minimax(new_tree_node, depth - 1);
+                    let evaluation = this.minimax(new_tree_node, depth - 1, offsets);
                     max_eval = Math.max(evaluation, max_eval);
+                    tree_node.score = max_eval;
                 }
             }
-            tree_node.score = max_eval;
+            return max_eval;
         } else {
             let min_eval = Number.POSITIVE_INFINITY;
             for (let col = 0; col < tree_node.game.board.n; col++) {
@@ -276,50 +357,15 @@ class Solver {
                     const clone = tree_node.game.clone();
                     clone.play(col);
                     let new_tree_node = new TreeNode(clone);
+                    new_tree_node.col_played = col;
                     tree_node.childs.push(new_tree_node);
-                    let evaluation = this.minimax(new_tree_node, depth - 1);
+                    let evaluation = this.minimax(new_tree_node, depth - 1, offsets);
                     min_eval = Math.min(evaluation, min_eval);
+                    tree_node.score = min_eval;
                 }
             }
-            tree_node.score = min_eval;
+            return min_eval;
         }
-    }
-
-    negamax(game, alpha, beta, depth) {
-        assert(alpha < beta, "alpha is smaller than beta");
-
-        if (game.isFull() || depth==0) {
-            return 0;
-        }
-
-        // Check if the player can win in the next movement
-        for (let col = 0; col < game.board.n; col++) {
-            if (game.canPlay(game.board, col) && game.isWinningMove(col)) {
-                return (game.board.m*game.board.n+1 - game.movements)/2;
-            }
-        }
-
-        let max = (game.board.m*game.board.n-1-game.movements)/2;
-        if (beta > max) {
-            beta = max;
-            if (alpha >= beta) return beta;
-        }
-
-        for (let col = 0; col < game.board.n; col++) {
-            if (game.canPlay(col)) {
-                let clone = game.clone();
-                clone.play(col);
-                let score = -this.negamax(clone, -beta, -alpha, depth-1);
-                if (score >= beta) {
-                    return score;
-                }
-                if (score > alpha) {
-                    alpha = score;
-                }
-            }
-        }
-
-        return alpha;
     }
 }
 
@@ -328,7 +374,7 @@ function setGridSize(rows, cols) {
     gameBoard.style.setProperty('--cols', cols);
 }
 
-function makeMove(event, game, game_cells) {
+function makeMove(event, game, game_cells, solver, offsets) {
     const col = parseInt(event.target.dataset.col);
     let current_player = 1 + game.movements%2;
     if (winner !== null) {
@@ -337,6 +383,7 @@ function makeMove(event, game, game_cells) {
         console.log("It's a draw!");
     } else {
         if (game.canPlay(col)) {
+            scoresArea.innerHTML = "";
             console.log("Player", current_player);
             if (game.isWinningMove(col)) {
                 winner = current_player;
@@ -346,6 +393,19 @@ function makeMove(event, game, game_cells) {
             game.play(col);
             game.board.print();
             current_player = current_player == 1 ? 2 : 1;
+            console.log("movements", game.movements);
+            let root = new TreeNode(game.clone());
+            root.col_played = col;
+            let score = solver.minimax(root, 4, offsets);
+            let scores_txt = "";
+            for (let i = 0; i < root.childs.length; i++) {
+                scores_txt += String(root.childs[i].col_played) + " " + String(root.childs[i].score) + " ";
+                game_cells[game.board.m][i].innerHTML = String(root.childs[i].score);
+            }
+            let txt_node = document.createTextNode(scores_txt);
+            scoresArea.appendChild(txt_node);
+            console.log("score:", score);
+            console.log(root);
         } else {
             console.log("Column is full. Try again.");
         }
@@ -363,16 +423,20 @@ playButton.addEventListener("click", function() {
         // Clear previos game
         gameBoard.innerHTML = "";
         winner = null;
-        setGridSize(size, size);
+        setGridSize(size+1, size);
 
         const game = new ConnectK(new Board(size, size), new Array(size).fill(0), k);
 
-        game_cells = [];
-        for (let row = 0; row < size; row++) {
-            cells = [];
+        let game_cells = [];
+        for (let row = 0; row < size+1; row++) {
+            let cells = [];
             for (let col = 0; col < size; col++) {
                 const cell = document.createElement("div");
-                cell.classList.add("grid-item");
+                if (row == size) {
+                    cell.classList.add("grid-txt-item");
+                } else {
+                    cell.classList.add("grid-item");
+                }
                 cell.dataset.row = row;
                 cell.dataset.col = col;
                 gameBoard.appendChild(cell);
@@ -381,20 +445,19 @@ playButton.addEventListener("click", function() {
             game_cells.push(cells);
         }
 
+        const cell = document.createElement("div");
+        cell.classList.add("grid-item");
+        game_cells.push(cell);
+        let solver = new Solver();
+        let offsets = solver.generate_offsets(k);
+
         for (let row = 0; row < size; row++) {
             for (let col = 0; col < size; col++) {
                 game_cells[row][col].addEventListener('click', function(event) {
-                    makeMove(event, game, game_cells);
+                    makeMove(event, game, game_cells, solver, offsets);
                 });
             }
         }
-
-        //console.log(game.play_sequence("1122"));
-        let root = new TreeNode(game.clone());
-        let solver = new Solver();
-        let score = solver.minimax(root, 3);
-        //game.generateDecisionTree(root, 3);
-        console.log(root);
     } else {
         console.log("Please enter a valid positive integer for the grid size.");
     } 
