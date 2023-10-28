@@ -3,9 +3,12 @@ const sizeInput = document.getElementById("size");
 const kInput = document.getElementById("k");
 const playButton = document.getElementById("play-button");
 const gameBoard = document.getElementById("game-board");
-const scoresArea = document.getElementById("scores-area");
 let winner = null;
+console.log(Number.POSITIVE_INFINITY - Number.NEGATIVE_INFINITY);
 
+/**
+ * Class to simulate the nodes of a tree.  
+ */
 class TreeNode {
     constructor (game) {
         this.game = game;
@@ -15,6 +18,9 @@ class TreeNode {
     }
 }
 
+/**
+ * Class to store the game board data.
+ */
 class Board {
     constructor(m, n) {
         this.m = m;
@@ -47,6 +53,9 @@ class Board {
     }
 }
 
+/**
+ * Class to simulate the game of Connect-k.
+ */
 class ConnectK {
     constructor(board, height, k) {
         this.board = board;
@@ -57,68 +66,6 @@ class ConnectK {
 
     print() {
         console.log("Board", this.board.m, this.board.n, this.k);
-    }
-
-    checkWin(player) {
-        // Check for a horizontal win
-        for (let row = 0; row < this.board.m; row++) {
-            for (let i = 0; i < this.board.n - this.k+1; i++) {
-                let flag = 0;
-                for (let k = i; k < i+this.k; k++) {
-                    if (this.board.values[row][k] == player) {
-                        flag++;
-                    }
-                }
-                if (flag == this.k) {
-                    return true;
-                }
-            }
-        }
-
-        // Check for a vertical win
-        for (let col = 0; col < this.board.n; col++) {
-            for (let row = 0; row < this.board.m - this.k+1; row++) {
-                let flag = 0;
-                for (let i = 0; i < this.k; i++) {
-                    if (this.board.values[row+i][col] == player) {
-                        flag++;
-                    }
-                }
-                if (flag == this.k) {
-                    return true;
-                }
-            }
-        }
-
-        // Check for a diagonal win (from bottom-right to top-left)
-        for (let row = 0; row < this.board.m - this.k+1; row++) {
-            for (let col = 0; col < this.board.n - this.k+1; col++) {
-                let flag = 0;
-                for (let i = 0; i < this.k; i++) {
-                    if (this.board.values[row+i][col+i] == player) {
-                        flag++;
-                    }
-                }
-                if (flag == this.k) {
-                    return true;
-                }
-            }
-        }
-
-        // Check for a diagonal win (from bottom-left to top-right)
-        for (let row = this.board.m - this.k+1; row < this.board.m; row++) {
-            for (let col = 0; col < this.board.n - this.k+1; col++) {
-                let flag = 0;
-                for (let i = 0; i < this.k; i++) {
-                    if (row-i >= 0 && this.board.values[row-i][col+i] == player) {
-                        flag++;
-                    }
-                }
-                if (flag == this.k) {
-                    return true;
-                }
-            }
-        }
     }
 
     isWinningMove(col) {
@@ -230,13 +177,32 @@ class ConnectK {
     }
 }
 
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message || 'Assertion failed');
-  }
-}
-
+/**
+ * Class to solve the game of Connect-k.
+ */
 class Solver {
+
+    constructor(game) {
+        this.column_order = [];
+        let cols = game.board.n;
+        for (let i = 0; i < cols; i++) {
+            this.column_order.push(Math.floor(cols / 2) + (1 - 2 * (i % 2)) * Math.floor((i + 1) / 2));
+        }
+        this.one_chip_scores = this.create_one_chip_scores(cols);
+    }
+
+    create_one_chip_scores(cols) {
+        let one_chip_scores = [];
+        let cnt = 40;
+        for (let i = 0; i < cols; i++) {
+            if (i < cols/2) {
+                one_chip_scores.push(cnt*(i+1));
+            } else {
+                one_chip_scores.push(cnt*(cols-i));
+            }
+        }
+        return one_chip_scores
+    }
 
     generate_offsets(k) {
         let offsets = [];
@@ -266,38 +232,100 @@ class Solver {
     get_score(game, offsets, col) {
         let score1 = 0;
         let score2 = 0;
-        for (let i = 0; i < offsets.length; i++) {
-            let row = game.board.m-game.height[col];
-            let flag = 0;
-            for (let j = 0; j < offsets[i].length; j++) {
-                let row_offset = offsets[i][j][0];
-                let col_offset = offsets[i][j][1];
-                if (row+row_offset <= game.board.m-1 && row+row_offset >= 0 && col+col_offset <= game.board.n-1 && col+col_offset >= 0) {
-                    flag += 1;
-                } else {
-                    break;
-                }
-            }
-            if (flag == offsets[i].length) {
-                let cnt1 = 0;
-                let cnt2 = 0;
+        let start_row = game.board.m-game.height[col];
+        for (let k = 0; k < game.board.m-start_row; k++) {
+            let row = start_row+k;
+            for (let i = 0; i < offsets.length; i++) {
+                let flag = 0;
                 for (let j = 0; j < offsets[i].length; j++) {
                     let row_offset = offsets[i][j][0];
                     let col_offset = offsets[i][j][1];
-                    if (game.board.values[row+row_offset][col+col_offset] == 1) {
-                        cnt1 += 1;
-                    } else if (game.board.values[row+row_offset][col+col_offset] == 2) {
-                        cnt2 += 1;
+                    if (row+row_offset <= game.board.m-1 && row+row_offset >= 0 && col+col_offset <= game.board.n-1 && col+col_offset >= 0) {
+                        flag += 1;
+                    } else {
+                        break;
                     }
                 }
-                if (cnt1 && cnt2 == 0) {
-                    score1 += cnt1;
-                }
-                if (cnt2 && cnt1 == 0) {
-                    score2 += cnt2;
+                if (flag == offsets[i].length) {
+                    let cnt1 = 0;
+                    let cnt2 = 0;
+                    for (let j = 0; j < offsets[i].length; j++) {
+                        let row_offset = offsets[i][j][0];
+                        let col_offset = offsets[i][j][1];
+                        if (game.board.values[row+row_offset][col+col_offset] == 1) {
+                            cnt1 += 1;
+                        } else if (game.board.values[row+row_offset][col+col_offset] == 2) {
+                            cnt2 += 1;
+                        }
+                    }
+                    if (cnt1 && cnt2 == 0) {
+                        if (cnt1 == 1) {
+                            let sel_col = -1;
+                            for (let j = 0; j < offsets[i].length; j++) {
+                                let row_offset = offsets[i][j][0];
+                                let col_offset = offsets[i][j][1];
+                                if (game.board.values[row+row_offset][col+col_offset] == 1) {
+                                    sel_col = col+col_offset;
+                                    break;
+                                }
+                            }
+                            score1 += this.one_chip_scores[sel_col];
+                        } else if (cnt1 == 2) {
+                            let start_col = -1;
+                            let end_col = -1;
+                            for (let j = 0; j < offsets[i].length; j++) {
+                                let row_offset = offsets[i][j][0];
+                                let col_offset = offsets[i][j][1];
+                                if (game.board.values[row+row_offset][col+col_offset] == 1 && start_col == -1) {
+                                    start_col = col+col_offset;
+                                } else if (game.board.values[row+row_offset][col+col_offset] == 1) {
+                                    end_col = col+col_offset;
+                                    break;
+                                }
+                            }
+                            score1 += (game.board.n-(Math.abs(end_col-start_col)+1))*10000;
+                        } else if (cnt1 == 3) {
+                            score1 += (game.board.n-1)*10000+10000;
+                        } else {
+                            score1 += 1000000;
+                        }
+                    }
+                    if (cnt2 && cnt1 == 0) {
+                        if (cnt2 == 1) {
+                            let sel_col = -1;
+                            for (let j = 0; j < offsets[i].length; j++) {
+                                let row_offset = offsets[i][j][0];
+                                let col_offset = offsets[i][j][1];
+                                if (game.board.values[row+row_offset][col+col_offset] == 2) {
+                                    sel_col = col+col_offset;
+                                    break;
+                                }
+                            }
+                            score2 += this.one_chip_scores[sel_col];
+                        } else if (cnt2 == 2) {
+                            let start_col = -1;
+                            let end_col = -1;
+                            for (let j = 0; j < offsets[i].length; j++) {
+                                let row_offset = offsets[i][j][0];
+                                let col_offset = offsets[i][j][1];
+                                if (game.board.values[row+row_offset][col+col_offset] == 2 && start_col == -1) {
+                                    start_col = col+col_offset;
+                                } else if (game.board.values[row+row_offset][col+col_offset] == 2) {
+                                    end_col = col+col_offset;
+                                    break;
+                                }
+                            }
+                            score2 += (game.board.n-(Math.abs(end_col-start_col)+1))*10000;
+                        } else if (cnt2 == 3) {
+                            score2 += (game.board.n-1)*10000+10000;
+                        } else {
+                            score2 += 1000000;
+                        }
+                    }
                 }
             }
         }
+        
         return [score1, score2]
     }
 
@@ -327,7 +355,7 @@ class Solver {
         return tree_node;
     }
 
-    minimax(tree_node, depth, offsets) {
+    minimax(tree_node, depth, offsets, alpha, beta) {
         if (depth === 0 || tree_node.game.isFull()) {
             // Generate the score of the current board
             let score = this.heuristic(tree_node.game, offsets);
@@ -338,30 +366,38 @@ class Solver {
         if (current_player === 1) {
             let max_eval = Number.NEGATIVE_INFINITY;
             for (let col = 0; col < tree_node.game.board.n; col++) {
-                if (tree_node.game.canPlay(col)) {
+                if (tree_node.game.canPlay(this.column_order[col])) {
                     const clone = tree_node.game.clone();
-                    clone.play(col);
+                    clone.play(this.column_order[col]);
                     let new_tree_node = new TreeNode(clone);
-                    new_tree_node.col_played = col;
+                    new_tree_node.col_played = this.column_order[col];
                     tree_node.childs.push(new_tree_node);
-                    let evaluation = this.minimax(new_tree_node, depth - 1, offsets);
+                    let evaluation = this.minimax(new_tree_node, depth - 1, offsets, alpha, beta);
                     max_eval = Math.max(evaluation, max_eval);
                     tree_node.score = max_eval;
+                    alpha = Math.max(alpha, evaluation);
+                    if (beta <= alpha) {
+                        break;
+                    }
                 }
             }
             return max_eval;
         } else {
             let min_eval = Number.POSITIVE_INFINITY;
             for (let col = 0; col < tree_node.game.board.n; col++) {
-                if (tree_node.game.canPlay(col)) {
+                if (tree_node.game.canPlay(this.column_order[col])) {
                     const clone = tree_node.game.clone();
-                    clone.play(col);
+                    clone.play(this.column_order[col]);
                     let new_tree_node = new TreeNode(clone);
-                    new_tree_node.col_played = col;
+                    new_tree_node.col_played = this.column_order[col];
                     tree_node.childs.push(new_tree_node);
-                    let evaluation = this.minimax(new_tree_node, depth - 1, offsets);
+                    let evaluation = this.minimax(new_tree_node, depth - 1, offsets, alpha, beta);
                     min_eval = Math.min(evaluation, min_eval);
                     tree_node.score = min_eval;
+                    beta = Math.min(beta, evaluation);
+                    if (beta <= alpha) {
+                        break;
+                    }
                 }
             }
             return min_eval;
@@ -374,8 +410,11 @@ function setGridSize(rows, cols) {
     gameBoard.style.setProperty('--cols', cols);
 }
 
-function makeMove(event, game, game_cells, solver, offsets) {
-    const col = parseInt(event.target.dataset.col);
+function makeMove(col, game, game_cells, solver, offsets) {
+    // reset cells
+    for (let i = 0; i < game.board.n; i++) {
+        game_cells[game.board.m][i].innerHTML = "";
+    }
     let current_player = 1 + game.movements%2;
     if (winner !== null) {
         console.log("Winner:", winner);
@@ -383,7 +422,6 @@ function makeMove(event, game, game_cells, solver, offsets) {
         console.log("It's a draw!");
     } else {
         if (game.canPlay(col)) {
-            scoresArea.innerHTML = "";
             console.log("Player", current_player);
             if (game.isWinningMove(col)) {
                 winner = current_player;
@@ -392,23 +430,44 @@ function makeMove(event, game, game_cells, solver, offsets) {
             game_cells[game.board.m-game.height[col]-1][col].style.backgroundColor = current_player === 1 ? "red" : "yellow";
             game.play(col);
             game.board.print();
+            // Swap current player
             current_player = current_player == 1 ? 2 : 1;
             console.log("movements", game.movements);
             let root = new TreeNode(game.clone());
             root.col_played = col;
-            let score = solver.minimax(root, 4, offsets);
-            let scores_txt = "";
+            let score = solver.minimax(root, 7, offsets, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
+            let best_col = -1;
+            // Select the best column
             for (let i = 0; i < root.childs.length; i++) {
-                scores_txt += String(root.childs[i].col_played) + " " + String(root.childs[i].score) + " ";
-                game_cells[game.board.m][i].innerHTML = String(root.childs[i].score);
+                game_cells[game.board.m][root.childs[i].col_played].innerHTML = String(Math.round(root.childs[i].score*100)/100);
+                if (score === root.childs[i].score && best_col === -1) {
+                    best_col = root.childs[i].col_played;
+                }
             }
-            let txt_node = document.createTextNode(scores_txt);
-            scoresArea.appendChild(txt_node);
             console.log("score:", score);
+            console.log("column:", best_col);
             console.log(root);
         } else {
             console.log("Column is full. Try again.");
         }
+    }
+}
+
+class Bot {
+    constructor (player) {
+        this.player = player;
+    }
+
+    select_col (game, solver) {
+        let root = new TreeNode(game.clone());
+        let score = solver.minimax(root, 5, offsets);
+        let best_col = -1;
+        for (let i = 0; i < root.childs.length; i++) {
+            if (score === root.childs[i].score) {
+                best_col = root.childs[i].col_played 
+            }
+        }
+        return best_col;
     }
 }
 
@@ -445,16 +504,23 @@ playButton.addEventListener("click", function() {
             game_cells.push(cells);
         }
 
-        const cell = document.createElement("div");
-        cell.classList.add("grid-item");
-        game_cells.push(cell);
-        let solver = new Solver();
+        let solver = new Solver(game);
+        console.log(solver.create_one_chip_scores(8));
         let offsets = solver.generate_offsets(k);
-
+        
+        /**
+        game.play_sequence("4444444");
+        game.board.print();
+        let root = new TreeNode(game.clone());
+        let score = solver.minimax(root, 2, offsets);
+        console.log(score);
+        console.log(root);
+        **/
         for (let row = 0; row < size; row++) {
             for (let col = 0; col < size; col++) {
                 game_cells[row][col].addEventListener('click', function(event) {
-                    makeMove(event, game, game_cells, solver, offsets);
+                    let col = parseInt(event.target.dataset.col);
+                    makeMove(col, game, game_cells, solver, offsets);
                 });
             }
         }
