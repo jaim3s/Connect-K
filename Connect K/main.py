@@ -8,11 +8,14 @@ class Board:
 
 def f1_scores(n):
     lst= []
+    inc = 30
     for i in range(n):
         if i < n//2:
-            lst.append(10*(i+1))
+            lst.append(inc)
+            inc += inc
         else:
-            lst.append(10*(n-i)) 
+            lst.append(inc) 
+            inc -= inc
     return lst
 
 def generate_board(sequence, board):
@@ -101,12 +104,10 @@ def main():
     offsets = generate_offsets(4)
     print(get_score(board, offsets,4, one_chip_scores))
     print(heuristic(board, offsets, one_chip_scores))
-
-    res = int("0000000001000000100000010000001000000000000000000", 2)
-    print(res)
-    print(res>>7)
-    print(connected_four(res))
     print(f1_scores(n))
+    a = int("100010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001", 2)
+    b = int("100010000000000000000001000000000000000000010000000000000000000000000000000000000000000000000000011", 2)
+    print(a^b)
 
 if __name__ == "__main__":
     main()

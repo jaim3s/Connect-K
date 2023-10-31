@@ -3,8 +3,8 @@
     border: 1px solid #ccc;
     margin-top: 20px;
     margin-bottom: 20px;
-    width: 400px; /* Set the initial width to 100% */
-    height: 440px; /* Let the height adjust automatically based on content */
+    width: 500px; /* Set the initial width to 100% */
+    height: 550px; /* Let the height adjust automatically based on content */
     grid-template-columns: repeat(var(--cols, 4), 1fr); /* Use a CSS variable for columns */
     grid-template-rows: repeat(var(--rows, 4), 1fr); /* Use a CSS variable for rows */
 }
